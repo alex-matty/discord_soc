@@ -10,7 +10,7 @@
 # UPDATES:
 # Add 1 or 2 more sources of news
 # URL decode messages to get them with the correct syntatx
-# Add link for each blog entrance (bleeping computer done, hackerone fix bug)
+# Add link for each blog entrance (bleeping computer done, hackerone seems to be done)
 # Fix bug of the add being fecthed by hackernews.
 
 #---------------------------------- Hacker news -----------------------------------#
