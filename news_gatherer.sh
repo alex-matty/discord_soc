@@ -52,10 +52,10 @@ while IFS= read -r line1 && IFS= read -r line2 <&3; do
   echo "$line2"
 done < hackernews.texts 3< hackernews.links >> hackernews.json.dirty
 # Transform the content of the json.dirty file into correct JSON syntax adding the "\n" symbol to separate the lines in the message for correct syntax
-cat hackernews.json.dirty | sed -z 's/\n/\\n/g' | sed 's/\\n$/\" }/g' >> hackernews.json 
+cat hackernews.json.dirty | sed -z 's/\n/\\n/g' | sed 's/\\n$/\", "flags": 4 }/g' >> hackernews.json 
 
 # Send the content of the corrected and complete json file to discord via webhook address
-curl -X POST -H "Content-Type: application/json" -d @hackernews.json  https://discordapp.com/api/webhooks/REDACTED
+curl -X POST -H "Content-Type: application/json" -d @hackernews.json $NEWS_GATHERER_WEBHOOK 
 
 # Wait 5 seconds to start with the second source of news.
 sleep 5
@@ -99,10 +99,10 @@ while IFS= read -r line1 && IFS= read -r line2 <&3; do
   echo "$line2"
 done < bleepingcomputer.texts 3< bleepingcomputer.links >> bleepingcomputer.json.dirty
 # Transform the content of the json.dirty file into correct JSON syntax adding the "\n" symbol to separate the lines in the message for correct syntax
-cat bleepingcomputer.json.dirty | sed -z 's/\n/\\n/g' | sed 's/\\n$/\" }/g' >> bleepingcomputer.json
+cat bleepingcomputer.json.dirty | sed -z 's/\n/\\n/g' | sed 's/\\n$/\", "flags": 4 }/g' >> bleepingcomputer.json
 
 # Send the content of the corrected and complete json file to discord via webhook address
-curl -X POST -H "Content-Type: application/json" -d @bleepingcomputer.json https://discordapp.com/api/webhooks/REDACTED
+curl -X POST -H "Content-Type: application/json" -d @bleepingcomputer.json $NEWS_GATHERER_WEBHOOK
 
 # Remove all previously created files used for parsing and formatting the JSON file and the JSON files used to send the information
 rm hackernews.* bleepingcomputer.*	
