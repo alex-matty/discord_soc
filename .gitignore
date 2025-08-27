@@ -1,0 +1,2 @@
+# Ignore .bak (backup files)
+*.bak
