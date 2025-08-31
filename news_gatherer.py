@@ -4,7 +4,7 @@
 # Created by @meganuke_ -------------------------------------#
 # This script can be used, modify, replicate for any purpose #
 # without any restrictions. ---------------------------------#
-# Version: 0.4 ----------------------------------------------#
+# Version: 0.5 ----------------------------------------------#
 ##############################################################
 
 # Import required libraries
@@ -46,7 +46,7 @@ formatted_date = today_date.strftime('%d %b %Y')
 
 def xml_to_json_payload_sender(rss_feed, rss_url):
   for feed, url in zip(rss_feed, rss_url):
-    variable_suffix = feed 
+    variable_prefix = feed 
     rss_feed_xml_url = url
 
     # Set the headers for a more friendly user agent
@@ -57,47 +57,47 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
     # GET request to obtain the XML and store it in a file to be able to handle it
     url_response = requests.get(rss_feed_xml_url, headers=headers)
     
-    with open(f'{variable_suffix}.xml', 'w', encoding='utf-8') as file:
+    with open(f'{variable_prefix}.xml', 'w', encoding='utf-8') as file:
       file.write(url_response.text)
 
     # Parse the contents to get only the required data
-    feed_parsed_xml = ET.parse(f"{variable_suffix}.xml",)
+    feed_parsed_xml = ET.parse(f"{variable_prefix}.xml",)
     root = feed_parsed_xml.getroot()
 
-    # Create a counter to understand what items have today's date
-    counter = 0
+    # Create a new_item_counter to understand what items have today's date
+    new_item_counter = 0
     for news_date in root.iter():
       if news_date.tag in ['pubDate']:
         if formatted_date in news_date.text:
-          counter+=1
+          new_item_counter+=1
 
     # Iterate over the XML file and write it in a dirty file to use as first iteration
-    with open(f'{variable_suffix}.xml_dirty', 'w') as file:
+    with open(f'{variable_prefix}.xml_dirty', 'w') as file:
       for element in root.iter():
         if element.tag in ['title', 'link', 'pubDate']:
           file.write(element.text + "\n")
 
     # Iterate over the dirty file to get rid of old entries
-    counter2 = 0
-    with open(f'{variable_suffix}.xml_cleaned', 'w') as file:
-      with open(f'{variable_suffix}.xml_dirty', 'r') as file2:
+    counter = 0
+    with open(f'{variable_prefix}.xml_cleaned', 'w') as file:
+      with open(f'{variable_prefix}.xml_dirty', 'r') as file2:
         for line in file2:
           file.write(line)
           if formatted_date in line:
-            counter2+=1
-            if counter2 == counter:
+            counter+=1
+            if counter == new_item_counter:
                 break
 
     # Remove date lines from the cleaned file
-    with open(f'{variable_suffix}.xml_cleaned', 'r') as file:
-      with open(f'{variable_suffix}.xml_no_date', 'w') as file2:
+    with open(f'{variable_prefix}.xml_cleaned', 'r') as file:
+      with open(f'{variable_prefix}.xml_no_date', 'w') as file2:
         for line in file:
           if formatted_date not in line:
             file2.write(line)
 
     # Convert text to json and add the correct formatting by creating a dictionary
-    with open(f'{variable_suffix}.xml_no_date', 'r') as file:
-      with open(f'{variable_suffix}.json_dirty', 'w') as file2:
+    with open(f'{variable_prefix}.xml_no_date', 'r') as file:
+      with open(f'{variable_prefix}.json_dirty', 'w') as file2:
         counter = 1
         for line in file:
           if counter == 1:
@@ -111,7 +111,7 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
           counter+=1
 
     # Store the content of the file in a variable and create a key value pair in the correct json syntax
-    with open(f'{variable_suffix}.json_dirty', 'r') as file:
+    with open(f'{variable_prefix}.json_dirty', 'r') as file:
       json_payload = file.read()
 
     json_payload_sent = {
@@ -126,14 +126,15 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
     }
 
     # validate the json to verify it's valid output and send only if valid
-    if is_valid_json(json_payload_sent) == True:
-      # Send the POST request to the webhook
-      post_request = requests.post(webhook, headers=request_headers, json=json_payload_sent)
-    else:
-      break
+    if new_item_counter != 0:
+      if is_valid_json(json_payload_sent) == True:
+        # Send the POST request to the webhook
+        post_request = requests.post(webhook, headers=request_headers, json=json_payload_sent)
+      else:
+        break
 
     # Delete files after use
-    for file in glob.glob(f'{variable_suffix}*'):
+    for file in glob.glob(f'{variable_prefix}*'):
       try:
         os.remove(file)
       except Exception as e:
