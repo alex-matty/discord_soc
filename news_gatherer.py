@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 
-# Create an iterative function to send the RSS feeds to Discord via webhook
+##############################################################
+# Created by @meganuke_ -------------------------------------#
+# This script can be used, modify, replicate for any purpose #
+# without any restrictions. ---------------------------------#
+# Version: 0.4 ----------------------------------------------#
+##############################################################
 
 # Import required libraries
 import requests
@@ -20,14 +25,16 @@ def is_valid_json(json_string):
 
 # Set the RSS feed names you will use in a dictionary
 rss_feed_name = [
-  'the_hacker_news'
-#  'bleeping_computer',
+  'the_hacker_news',
+  'bleeping_computer',
+  'dark_reading'
 ]
 
 # Set the RSS feed URLs to use in a dictionary
 rss_feed_url =[ 
-  'https://feeds.feedburner.com/TheHackersNews'
-#  'https://www.bleepingcomputer.com/feed/',
+  'https://feeds.feedburner.com/TheHackersNews',
+  'https://www.bleepingcomputer.com/feed/',
+  'https://www.darkreading.com/rss.xml'
 ]
 
 # Set the ENV variable to be used in the function
@@ -42,8 +49,13 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
     variable_suffix = feed 
     rss_feed_xml_url = url
 
+    # Set the headers for a more friendly user agent
+    headers = {
+      'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+
     # GET request to obtain the XML and store it in a file to be able to handle it
-    url_response = requests.get(rss_feed_xml_url)
+    url_response = requests.get(rss_feed_xml_url, headers=headers)
     
     with open(f'{variable_suffix}.xml', 'w', encoding='utf-8') as file:
       file.write(url_response.text)
@@ -108,17 +120,18 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
     }
 
     # Send the json file to the discord webhook
-    # webhook = os.environ['NEWS_GATHERER_WEBHOOK'] 
+    webhook = os.environ['NEWS_GATHERER_WEBHOOK']
     request_headers = {
       "Content-Type": "application/json"
     }
 
-    # validate the json to verify it's valid output
-    #print(is_valid_json(json_payload_sent))
+    # validate the json to verify it's valid output and send only if valid
+    if is_valid_json(json_payload_sent) == True:
+      # Send the POST request to the webhook
+      post_request = requests.post(webhook, headers=request_headers, json=json_payload_sent)
+    else:
+      break
 
-    # Send the POST request to the webhook
-    post_request = requests.post(webhook, headers=request_headers, json=json_payload_sent)
-    
     # Delete files after use
     for file in glob.glob(f'{variable_suffix}*'):
       try:
@@ -126,8 +139,5 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
       except Exception as e:
         break
 
-# Execute the function calling the lists
+# Execute the function calling the feeds
 xml_to_json_payload_sender(rss_feed_name, rss_feed_url)
-
-# Unset ENV variables to keep it clean
-# os.environ.pop('NEWS_GATHERER_WEBHOOK', None)
