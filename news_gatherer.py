@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
-##############################################################
-# Created by @meganuke_ -------------------------------------#
-# This script can be used, modify, replicate for any purpose #
-# without any restrictions. ---------------------------------#
-# Version: 0.5 ----------------------------------------------#
-##############################################################
+# Description : Fetch RSS feeds and show the latest news in a discord channel 
+# Version     : 0.6
+# Author      : Meganuke_
+# Date        : 2025-09-16
+# Usage       : python3 news_gatherer.py
+# Notes       : TODO - Improve readability
 
 # Import required libraries
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 import glob
@@ -43,6 +43,8 @@ webhook = os.environ['NEWS_GATHERER_WEBHOOK']
 # Set the date as a variable to get the correct formatting to get rid of the old entries
 today_date = datetime.now()
 formatted_date = today_date.strftime('%d %b %Y')
+next_day_date = today_date + timedelta(days=1)
+formatted_next_date = next_day_date.strftime('%d %b %Y')
 
 def xml_to_json_payload_sender(rss_feed, rss_url):
   for feed, url in zip(rss_feed, rss_url):
@@ -68,7 +70,7 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
     new_item_counter = 0
     for news_date in root.iter():
       if news_date.tag in ['pubDate']:
-        if formatted_date in news_date.text:
+        if formatted_date in news_date.text or formatted_next_date in news_date.text:
           new_item_counter+=1
 
     # Iterate over the XML file and write it in a dirty file to use as first iteration
@@ -83,7 +85,7 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
       with open(f'{variable_prefix}.xml_dirty', 'r') as file2:
         for line in file2:
           file.write(line)
-          if formatted_date in line:
+          if formatted_date in line or formatted_next_date in line:
             counter+=1
             if counter == new_item_counter:
                 break
@@ -92,7 +94,7 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
     with open(f'{variable_prefix}.xml_cleaned', 'r') as file:
       with open(f'{variable_prefix}.xml_no_date', 'w') as file2:
         for line in file:
-          if formatted_date not in line:
+          if formatted_date not in line and formatted_next_date not in line:
             file2.write(line)
 
     # Convert text to json and add the correct formatting by creating a dictionary
