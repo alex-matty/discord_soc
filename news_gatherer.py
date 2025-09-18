@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Description : Fetch RSS feeds and show the latest news in a discord channel 
-# Version     : 0.6
+# Version     : 0.7
 # Author      : Meganuke_
 # Date        : 2025-09-16
 # Usage       : python3 news_gatherer.py
@@ -57,6 +57,7 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
     }
 
     # GET request to obtain the XML and store it in a file to be able to handle it
+    print(f'Fetching News from {variable_prefix}')
     url_response = requests.get(rss_feed_xml_url, headers=headers)
     
     with open(f'{variable_prefix}.xml', 'w', encoding='utf-8') as file:
@@ -72,6 +73,12 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
       if news_date.tag in ['pubDate']:
         if formatted_date in news_date.text or formatted_next_date in news_date.text:
           new_item_counter+=1
+
+    # Show the current number of entries found for each feed
+    if new_item_counter > 0:
+      print(f'found {new_item_counter} entries for {variable_prefix}')
+    else:
+      print(f'No new entries found for {variable_prefix}, skipping')
 
     # Iterate over the XML file and write it in a dirty file to use as first iteration
     with open(f'{variable_prefix}.xml_dirty', 'w') as file:
@@ -132,6 +139,7 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
       if is_valid_json(json_payload_sent) == True:
         # Send the POST request to the webhook
         post_request = requests.post(webhook, headers=request_headers, json=json_payload_sent)
+        print(f'Successfully Sent {variable_prefix} News Feed to Discord')
       else:
         break
 
@@ -143,4 +151,5 @@ def xml_to_json_payload_sender(rss_feed, rss_url):
         break
 
 # Execute the function calling the feeds
-xml_to_json_payload_sender(rss_feed_name, rss_feed_url)
+if __name__ == "__main__":
+  xml_to_json_payload_sender(rss_feed_name, rss_feed_url)
