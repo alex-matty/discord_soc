@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 # Description : Fetch RSS feeds and show the latest news in a discord channel 
-# Version     : 0.7
+# Version     : 0.8
 # Author      : Meganuke_
-# Date        : 2025-09-16
+# Date        : 2026-04-16
 # Usage       : python3 news_gatherer.py
 # Notes       : TODO - Improve readability
 
@@ -14,6 +14,16 @@ from datetime import datetime, timedelta
 import json
 import os
 import glob
+
+# Function to get .env variables
+def load_env(file_path=".env"):
+  if os.path.exists(file_path):
+    with open(file_path) as f:
+      for line in f:
+        if line.strip() and not line.startswith("#"):
+          key, value = line.strip().split("=", 1)
+          os.environ[key] = value
+load_env()
 
 # Function to validated json payload
 def is_valid_json(json_string):
@@ -38,7 +48,7 @@ rss_feed_url =[
 ]
 
 # Set the ENV variable to be used in the function
-webhook = os.environ['NEWS_GATHERER_WEBHOOK']
+webhook = os.getenv('NEWS_GATHERER_WEBHOOK')
 
 # Set the date as a variable to get the correct formatting to get rid of the old entries
 today_date = datetime.now()

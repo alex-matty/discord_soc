@@ -4,15 +4,25 @@
 # Author      : Meganuke_
 # Date        : 2025-09-10
 # Usage       : python3 cve_gatherer.py
-# Notes       : TODO - Review the script to understand it's usage and align it to my needs
+# Notes       : TODO - Change datetime functions to a newer one
 
 import requests
 import json
 from datetime import datetime, timedelta
 import os
 
+def load_env(file_path=".env"):
+  if os.path.exists(file_path):
+    with open(file_path) as f:
+      for line in f:
+        if line.strip() and not line.startswith("#"):
+          key, value = line.strip().split("=", 1)
+          os.environ[key] = value
+
+load_env()
+
 # Set up the webhook URL by fetching it from the .ENV variables 
-DISCORD_WEBHOOK_URL = os.environ['CVE_GATHERER_WEBHOOK'] 
+DISCORD_WEBHOOK_URL = os.getenv('CVE_GATHERER_WEBHOOK')
 
 # NVD API endpoint for fetching vulnerabilities. We'll query for CVEs created in the last 24 hours.
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
