@@ -4,6 +4,19 @@
 import requests
 import json
 import re
+import os
+
+# Get .ENV variables from an .ENV file
+def load_env(file_path=None):
+  if file_path is None:
+    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    with open(file_path) as f:
+      for line in f:
+        if line.strip() and not line.startswith("#"):
+          key, value = line.strip().split("=", 1)
+          os.environ[key] = value
+
+load_env()
 
 # Function to defang URLs or Domain names
 def defang(value, type_):
@@ -61,7 +74,7 @@ def flush_chunk(chunk):
 
 # Tweetfeed API URL endpoint (@TODO Add variables to use filters)
 url = 'https://api.tweetfeed.live/v1/today'
-WEBHOOK_URL = "https://discord.com/api/webhooks/1495546244095934526/4ebkkg8PSdkID5nwIp5rFj6gRdpkLvhpnKC3x5TjK8bFWz27jGyfO4yvbMHG6yLVQUZ1"
+WEBHOOK_URL = os.getenv('TWEETFEED_WEBHOOK')
 CHAR_LIMIT = 2000
 CODE_BLOCK = 15 
 DISCORD_PAYLOAD_OVERHEAD = 30
