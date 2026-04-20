@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 
+# Description : fetch latest IoCs from Tweetfeed and post them to a dedicated webhook
+# Version     : 0.1
+# Author      : Meganuke_
+# Date        : 2026-04-19
+# Usage       : python3 tweetfeed_fetcher.py
+# Notes       : TODO - Reorganize the code block for better readability
+
+
 # Import required libraries
 import requests
 import json
