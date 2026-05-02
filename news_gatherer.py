@@ -1,166 +1,129 @@
 #!/usr/bin/env python3
 
 # Description : Fetch RSS feeds and show the latest news in a discord channel 
-# Version     : 0.8
-# Author      : Meganuke_
-# Date        : 2026-04-16
+# Version     : 1.0
+# Author      : Meganuke_ (Refactored by Gemini CLI)
+# Date        : 2026-05-01
 # Usage       : python3 news_gatherer.py
-# Notes       : TODO - Improve readability
+# Notes       : Refactored for efficiency and visual appeal (Discord Embeds)
 
 # Import required libraries
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import os
-import glob
+from email.utils import parsedate_to_datetime
 
 # Function to get .env variables
 def load_env(file_path=None):
   if file_path is None:
     file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-    with open(file_path) as f:
-      for line in f:
-        if line.strip() and not line.startswith("#"):
-          key, value = line.strip().split("=", 1)
-          os.environ[key] = value
+    try:
+      with open(file_path) as f:
+        for line in f:
+          if line.strip() and not line.startswith("#"):
+            key, value = line.strip().split("=", 1)
+            os.environ[key] = value
+    except FileNotFoundError:
+      print(f"Warning: .env file not found at {file_path}")
+
 load_env()
 
-# Function to validated json payload
-def is_valid_json(json_string):
-  try:
-    json.dumps(json_string)
-    return True
-  except ValueError:
-    return False
+# NEW CONFIGURATION: Added 'color' and 'icon' to the feed dictionary
+# This allows each embed card to have a distinct brand color (Decimal format)
+rss_feeds = {
+  'the_hacker_news': {
+      'url': 'https://feeds.feedburner.com/TheHackersNews',
+      'color': 15158332, # Red
+  },
+  'bleeping_computer': {
+      'url': 'https://www.bleepingcomputer.com/feed/',
+      'color': 3447003, # Blue
+  },
+  'dark_reading': {
+      'url': 'https://www.darkreading.com/rss.xml',
+      'color': 15844367, # Gold/Yellow
+  }
+}
 
-# Set the RSS feed names you will use in a dictionary
-rss_feed_name = [
-  'the_hacker_news',
-  'bleeping_computer',
-  'dark_reading'
-]
+WEBHOOK_URL = os.getenv('NEWS_GATHERER_WEBHOOK')
 
-# Set the RSS feed URLs to use in a dictionary
-rss_feed_url =[ 
-  'https://feeds.feedburner.com/TheHackersNews',
-  'https://www.bleepingcomputer.com/feed/',
-  'https://www.darkreading.com/rss.xml'
-]
+def xml_to_json_payload_sender():
+  if not WEBHOOK_URL:
+    print("Error: NEWS_GATHERER_WEBHOOK not set in environment.")
+    return
 
-# Set the ENV variable to be used in the function
-webhook = os.getenv('NEWS_GATHERER_WEBHOOK')
+  now = datetime.now(timezone.utc)
+  time_threshold = now - timedelta(hours=24)
 
-# Set the date as a variable to get the correct formatting to get rid of the old entries
-today_date = datetime.now()
-formatted_date = today_date.strftime('%d %b %Y')
-next_day_date = today_date + timedelta(days=1)
-formatted_next_date = next_day_date.strftime('%d %b %Y')
-
-def xml_to_json_payload_sender(rss_feed, rss_url):
-  for feed, url in zip(rss_feed, rss_url):
-    variable_prefix = feed 
-    rss_feed_xml_url = url
-
-    # Set the headers for a more friendly user agent
+  for feed_name, config in rss_feeds.items():
+    url = config['url']
     headers = {
-      'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
 
-    # GET request to obtain the XML and store it in a file to be able to handle it
-    print(f'Fetching News from {variable_prefix}')
-    url_response = requests.get(rss_feed_xml_url, headers=headers)
-    
-    with open(f'{variable_prefix}.xml', 'w', encoding='utf-8') as file:
-      file.write(url_response.text)
+    try:
+      print(f'Fetching News from {feed_name}')
+      response = requests.get(url, headers=headers, timeout=30)
+      response.raise_for_status()
+      
+      root = ET.fromstring(response.content)
+      
+      news_items = []
+      for item in root.findall('.//item'):
+        title = item.find('title').text if item.find('title') is not None else "No Title"
+        link = item.find('link').text if item.find('link') is not None else ""
+        pub_date_str = item.find('pubDate').text if item.find('pubDate') is not None else None
+        
+        if pub_date_str:
+          try:
+            pub_date = parsedate_to_datetime(pub_date_str)
+            if pub_date.tzinfo is None:
+              pub_date = pub_date.replace(tzinfo=timezone.utc)
+            
+            if pub_date > time_threshold:
+              # NEW LOGIC: Using bullet points for better embed description formatting
+              news_items.append(f"• [{title.strip()}]({link.strip()})")
+          except Exception as e:
+            continue
 
-    # Parse the contents to get only the required data
-    feed_parsed_xml = ET.parse(f"{variable_prefix}.xml",)
-    root = feed_parsed_xml.getroot()
+      if not news_items:
+        print(f'No new entries found for {feed_name}, skipping')
+        continue
 
-    # Create a new_item_counter to understand what items have today's date
-    new_item_counter = 0
-    for news_date in root.iter():
-      if news_date.tag in ['pubDate']:
-        if formatted_date in news_date.text or formatted_next_date in news_date.text:
-          new_item_counter+=1
+      print(f'Found {len(news_items)} entries for {feed_name}')
 
-    # Show the current number of entries found for each feed
-    if new_item_counter > 0:
-      print(f'found {new_item_counter} entries for {variable_prefix}')
-    else:
-      print(f'No new entries found for {variable_prefix}, skipping')
+      # PREVIOUS LOGIC: message_content = "# **Title**\n" + "- [link]"
+      # NEW LOGIC: Constructing a Discord Embed object.
+      # IMPROVEMENT: Instead of "content", we use the "embeds" array. This creates a card with 
+      # a side-color, a header, and a cleaner link list.
+      
+      embed = {
+          "title": f"Latest News: {feed_name.replace('_', ' ').title()}",
+          "description": "\n".join(news_items),
+          "color": config['color'],
+          "timestamp": now.isoformat(), # Adds the time at the bottom of the card
+          "footer": {
+              "text": f"SOC News Gatherer • {len(news_items)} articles"
+          }
+      }
 
-    # Iterate over the XML file and write it in a dirty file to use as first iteration
-    with open(f'{variable_prefix}.xml_dirty', 'w') as file:
-      for element in root.iter():
-        if element.tag in ['title', 'link', 'pubDate']:
-          file.write(element.text + "\n")
+      # Discord takes an array of embeds (up to 10 per message)
+      payload = {
+          "embeds": [embed]
+      }
+      
+      # Truncate description if it exceeds Discord's 4096 limit for embeds
+      if len(embed["description"]) > 4000:
+          embed["description"] = embed["description"][:3990] + "..."
 
-    # Iterate over the dirty file to get rid of old entries
-    counter = 0
-    with open(f'{variable_prefix}.xml_cleaned', 'w') as file:
-      with open(f'{variable_prefix}.xml_dirty', 'r') as file2:
-        for line in file2:
-          file.write(line)
-          if formatted_date in line or formatted_next_date in line:
-            counter+=1
-            if counter == new_item_counter:
-                break
+      post_request = requests.post(WEBHOOK_URL, json=payload, timeout=30)
+      post_request.raise_for_status()
+      print(f'Successfully Sent {feed_name} Embed to Discord')
 
-    # Remove date lines from the cleaned file
-    with open(f'{variable_prefix}.xml_cleaned', 'r') as file:
-      with open(f'{variable_prefix}.xml_no_date', 'w') as file2:
-        for line in file:
-          if formatted_date not in line and formatted_next_date not in line:
-            file2.write(line)
+    except Exception as e:
+      print(f'Error processing {feed_name}: {e}')
 
-    # Convert text to json and add the correct formatting by creating a dictionary
-    with open(f'{variable_prefix}.xml_no_date', 'r') as file:
-      with open(f'{variable_prefix}.json_dirty', 'w') as file2:
-        counter = 1
-        for line in file:
-          if counter == 1:
-            file2.write(f'# **[{line.strip()}]')
-          elif counter == 2:
-            file2.write(f'({line.strip()})**\n')
-          elif counter % 2 != 0:
-            file2.write(f'- [{line.strip()}]')
-          else:
-            file2.write(f'({line.strip()})\n')
-          counter+=1
-
-    # Store the content of the file in a variable and create a key value pair in the correct json syntax
-    with open(f'{variable_prefix}.json_dirty', 'r') as file:
-      json_payload = file.read()
-
-    json_payload_sent = {
-      "content": json_payload,
-      "flags": 4
-    }
-
-    # Send the json file to the discord webhook
-    webhook = os.environ['NEWS_GATHERER_WEBHOOK']
-    request_headers = {
-      "Content-Type": "application/json"
-    }
-
-    # validate the json to verify it's valid output and send only if valid
-    if new_item_counter != 0:
-      if is_valid_json(json_payload_sent) == True:
-        # Send the POST request to the webhook
-        post_request = requests.post(webhook, headers=request_headers, json=json_payload_sent)
-        print(f'Successfully Sent {variable_prefix} News Feed to Discord')
-      else:
-        break
-
-    # Delete files after use
-    for file in glob.glob(f'{variable_prefix}*'):
-      try:
-        os.remove(file)
-      except Exception as e:
-        break
-
-# Execute the function calling the feeds
 if __name__ == "__main__":
-  xml_to_json_payload_sender(rss_feed_name, rss_feed_url)
+  xml_to_json_payload_sender()
