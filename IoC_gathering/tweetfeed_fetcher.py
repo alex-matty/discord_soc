@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 
 # Description : fetch latest IoCs from Tweetfeed and post them to a dedicated webhook
-# Version     : 0.1
-# Author      : Meganuke_
-# Date        : 2026-04-19
+# Version     : 1.1
+# Author      : Meganuke_ (Refactored by Gemini CLI)
+# Date        : 2026-05-01
 # Usage       : python3 tweetfeed_fetcher.py
-# Notes       : -
+# Notes       : Richly styled embeds, clustered by type, with state management and GMT-6 conversion
 
 # Import required libraries
 import requests
 import json
 import os
+import time
+from datetime import datetime, timedelta
 
-# Static variables used for the main script
+# Static variables
 URL = 'https://api.tweetfeed.live/v1/today'
-CHAR_LIMIT = 2000
-DISCORD_PAYLOAD_OVERHEAD = 30
-EFFECTIVE_LIMIT = CHAR_LIMIT - DISCORD_PAYLOAD_OVERHEAD
+# State file to track the last seen IoC and avoid duplicates
+STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "last_seen_ioc.txt")
 
-# Load ENV variables from an .env file into os.environ
+# Load ENV variables from an .env file
 def load_env(file_path=None):
   if file_path is None:
     file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -33,10 +34,18 @@ def load_env(file_path=None):
     print(f".env file not found at {file_path}")
     exit(1)
 
-# Get Webhook URL address from the .ENV file
 load_env()
 WEBHOOK_URL = os.getenv('TWEETFEED_WEBHOOK')
 
+# Converts UTC time from API to user's local time (GMT-6) for better context.
+def utc_to_local(utc_date_str):
+    try:
+        # Input format: 2026-05-02 05:23:00
+        utc_dt = datetime.strptime(utc_date_str, "%Y-%m-%d %H:%M:%S")
+        local_dt = utc_dt - timedelta(hours=6)
+        return local_dt.strftime("%Y-%m-%d %H:%M:%S") + " (GMT-6)"
+    except Exception:
+        return utc_date_str
 
 # Function to defang URL, IP or Domain names
 def defang(value, type_):
@@ -49,71 +58,129 @@ def defang(value, type_):
     return value
   return value
 
-# Define the truncate function to not pass the message length limit
-def truncate_content(content):
-  if len(content) > EFFECTIVE_LIMIT:
-    truncated = content[:EFFECTIVE_LIMIT -7]
-    return truncated + "\n...\n```"
-  return content
+# Enhanced style mapping with Emojis and Colors
+TYPE_STYLE = {
+    "url": {"color": 15158332, "emoji": "🌐"},    # Red / Globe
+    "ip": {"color": 3447003, "emoji": "💻"},     # Blue / Computer
+    "domain": {"color": 15844367, "emoji": "🏠"}, # Gold / House
+    "sha256": {"color": 10181046, "emoji": "🔑"}, # Purple / Key
+    "md5": {"color": 10181046, "emoji": "🔑"}     # Purple / Key
+}
 
-# Function to create the main discord payload block and send it to the webhook
-def flush_chunk(chunk):
-  content = f"```json\n{json.dumps(chunk, indent=2)}\n```"
-  content = truncate_content(content)
-
-  discord_payload = {
-    "content": content,
-    "flags": 4
-  }
-
+def send_payload(payload):
   try:
-    response = requests.post(WEBHOOK_URL, json=discord_payload) 
+    response = requests.post(WEBHOOK_URL, json=payload, timeout=30) 
     response.raise_for_status()
-    print(f"Sent {len(chunk)} item(s) to Discord ({len(content)} chars)")
+    print(f"Sent batch of {len(payload['embeds'])} Embed(s) to Discord")
+    time.sleep(1) 
   except requests.exceptions.RequestException as e:
-    print(f"Failed to send chunk to discord: {e}")
+    print(f"Failed to send batch: {e}")
 
-# Build and send Chunked discord payloads
-# If a payload is greater than the length, create a new payload
-def send_to_discord(items):
-  chunk = []
-  
+def process_and_send(items):
+  grouped = {}
   for item in items:
-    chunk.append(item)
+    itype = item['type']
+    if itype not in grouped:
+      grouped[itype] = []
+    grouped[itype].append(item)
 
-    content = f"```json\n{json.dumps(chunk, indent=2)}\n```"
-    total_len = len(json.dumps({"content": content, "flags": 4}))
+  current_batch = []
+  current_batch_total_chars = 0
+  
+  for itype, itype_items in grouped.items():
+    style = TYPE_STYLE.get(itype, {"color": 8359053, "emoji": "🔍"})
+    
+    # Start description with a bold summary
+    itype_description = f"**{style['emoji']} Found {len(itype_items)} New {itype.upper()} Indicators**\n\n"
+    
+    for item in itype_items:
+      tags_str = f" • **Tags**: `{', '.join(item['tags'])}`" if item['tags'] else ""
+      line = f"• `{item['value']}`{tags_str}\n"
+      
+      if len(itype_description) + len(line) > 4000:
+        embed = {
+            "title": f"Threat Intelligence: {itype.upper()} (Continued)",
+            "description": itype_description,
+            "color": style['color'],
+            "footer": {"text": f"Tweetfeed.live Feed • SOC Monitor"}
+        }
+        
+        if current_batch_total_chars + len(embed["description"]) > 5500:
+          send_payload({"embeds": current_batch})
+          current_batch = []
+          current_batch_total_chars = 0
+        
+        current_batch.append(embed)
+        current_batch_total_chars += len(embed["description"])
+        itype_description = f"**{style['emoji']} {itype.upper()} (Continued)**\n\n" + line
+      else:
+        itype_description += line
 
-    if total_len > CHAR_LIMIT:
-      chunk.pop()
-      flush_chunk(chunk)
-      chunk = [item]
+    if itype_description:
+      local_date = utc_to_local(itype_items[0]['date'])
+      embed = {
+          "title": f"Threat Intelligence: {itype.upper()}",
+          "description": itype_description,
+          "color": style['color'],
+          "footer": {"text": f"Tweetfeed.live Feed • {local_date}"}
+      }
+      
+      if current_batch_total_chars + len(embed["description"]) > 5500:
+        send_payload({"embeds": current_batch})
+        current_batch = []
+        current_batch_total_chars = 0
+      
+      current_batch.append(embed)
+      current_batch_total_chars += len(embed["description"])
 
-  if chunk:
-    flush_chunk(chunk)
+    if len(current_batch) >= 10:
+      send_payload({"embeds": current_batch})
+      current_batch = []
+      current_batch_total_chars = 0
+
+  if current_batch:
+    send_payload({"embeds": current_batch})
+
+# State management functions
+def get_last_seen():
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f:
+            return f.read().strip()
+    return ""
+
+def set_last_seen(date_str):
+    with open(STATE_FILE, "w") as f:
+        f.write(date_str)
 
 def main():
-  # Fetch and parse today's IoC feed. Exit early if the API is unreachable or returns an error 
   try:
-    response = requests.get(URL)
+    response = requests.get(URL, timeout=30)
     response.raise_for_status()
     data = response.json()
   except requests.exceptions.RequestException as e:
     print(f"Failed to fetch data: {e}")
     exit(1)
   
-  # Select only relevant fields and defang values to prevent accidental resolution
-  json_payload = [
+  last_seen = get_last_seen()
+  new_items = [i for i in data if i["date"] > last_seen]
+  new_items.sort(key=lambda x: x["date"])
+
+  if not new_items:
+    print("No new IoCs found since last run.")
+    return
+
+  processed_items = [
     {
       "date": item["date"],
       "type": item["type"],
       "value": defang(item["value"], item["type"]),
-      "tags": item["tags"],
+      "tags": item.get("tags", []),
     }
-    for item in data
+    for item in new_items
   ]
   
-  send_to_discord(json_payload)
+  process_and_send(processed_items)
+  set_last_seen(new_items[-1]["date"])
 
 if __name__ == "__main__":
-  main() 
+  main()
