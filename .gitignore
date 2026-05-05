@@ -1,3 +1,6 @@
 # Ignore .bak (backup files)
 *.bak
 *.env
+
+# SOC state files
+IoC_gathering/last_seen_ioc.txt
