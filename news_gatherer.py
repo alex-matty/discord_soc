@@ -81,7 +81,7 @@ def xml_to_json_payload_sender():
               pub_date = pub_date.replace(tzinfo=timezone.utc)
             
             if pub_date > time_threshold:
-\              news_items.append(f"• [{title.strip()}]({link.strip()})")
+              news_items.append(f"• [{title.strip()}]({link.strip()})")
           except Exception as e:
             continue
 
