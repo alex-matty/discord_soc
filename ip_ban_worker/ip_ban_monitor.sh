@@ -4,7 +4,7 @@
 # @TODO Add the AbuseIPDB report
 #       Run AbuseIPDB report in other bash file for memory saving
 
-LOG_FILE="read_logs"
+LOG_FILE="/var/log/fail2ban.log"
 # Embed will be red as it states a blocked IP
 EMBED_COLOR='15158332'
 
