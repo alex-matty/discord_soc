@@ -2,8 +2,11 @@
 
 # Create a script that reports a banned IP from Fail2Ban
 
+# Set the dir_name to use as a base for the absolute path of the .env file
+dir_name=$(dirname "$0")
+
 # Get the API key from .env file and check if it has been properly set
-ABUSE_IPDB_API_KEY=$(grep -E '^ABUSE_IPDB_API_KEY' ../.env | cut -d '=' -f 2 | tr -d '"' | tr -d "'")
+ABUSE_IPDB_API_KEY=$(grep -E '^ABUSE_IPDB_API_KEY' "$dir_name/../.env" | cut -d '=' -f 2 | tr -d '"' | tr -d "'")
 
 if [ -z "$ABUSE_IPDB_API_KEY" ]; then
   echo 'Error: AbuseIPDB API Key not found in .env file.'

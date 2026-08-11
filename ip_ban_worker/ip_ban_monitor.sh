@@ -11,7 +11,7 @@ EMBED_COLOR='15158332'
 dir_name=$(dirname "$0")
 
 # Get the webhook URL from an .env file without sourcing it 
-WEBHOOK=$(grep -E '^FAIL2BAN_WEBHOOK=' .env | cut -d '=' -f 2 | tr -d '"' | tr -d "'")
+WEBHOOK=$(grep -E '^FAIL2BAN_WEBHOOK=' "$dir_name/.env" | cut -d '=' -f 2 | tr -d '"' | tr -d "'")
 
 # Check if webhook is present otherwise exit 
 if [ -z "$WEBHOOK" ]; then
