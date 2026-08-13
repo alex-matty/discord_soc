@@ -22,7 +22,7 @@ STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "last_seen
 # Load ENV variables from an .env file
 def load_env(file_path=None):
   if file_path is None:
-    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.env")
 
   try:
     with open(file_path) as f:

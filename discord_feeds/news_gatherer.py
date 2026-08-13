@@ -18,7 +18,7 @@ from email.utils import parsedate_to_datetime
 # Function to get .env variables
 def load_env(file_path=None):
   if file_path is None:
-    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.env")
     try:
       with open(file_path) as f:
         for line in f:
