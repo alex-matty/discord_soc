@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 
 # This one will be used to detect a log entry that is shown as banned 
-# @TODO Add the AbuseIPDB report
-#       Run AbuseIPDB report in other bash file for memory saving
+# @TODO 
 
 LOG_FILE="/var/log/fail2ban.log"
 # Embed will be red as it states a blocked IP
 EMBED_COLOR='15158332'
 
+# Get the absolute path of the location directory
+dir_name=$(dirname "$0")
+
 # Get the webhook URL from an .env file without sourcing it 
-WEBHOOK=$(grep -E '^FAIL2BAN_WEBHOOK=' .env | cut -d '=' -f 2 | tr -d '"' | tr -d "'")
+WEBHOOK=$(grep -E '^FAIL2BAN_WEBHOOK=' "$dir_name/.env" | cut -d '=' -f 2 | tr -d '"' | tr -d "'")
 
 # Check if webhook is present otherwise exit 
 if [ -z "$WEBHOOK" ]; then
@@ -23,15 +25,20 @@ tail -f "$LOG_FILE" | while IFS= read -r line; do
   if [[ "$line" == *"NOTICE"*"[sshd] Ban"* ]]; then
     
     # Get the IP from the message
-    ip_address=$(echo $line | grep --line-buffered -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sed 's/\./[.]/g')
+    ip_address=$(echo $line | grep --line-buffered -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' )
+    defanged_ip_address=$(echo $ip_address | sed 's/\./[.]/g' )
     extracted_timestamp=$(echo $line | awk '{print $1, $2}')
+
+    # Send the IP address to the abuseipdb_report.sh script for reporting
+    reported_ip_status=$("$dir_name/abuseIPDB/abuseipdb_report.sh" $ip_address)
 
     json_payload=$(jq -n -c \
       --arg title "Fail2Ban IP Block Notification" \
       --arg color "$EMBED_COLOR" \
-      --arg ip "\`$ip_address\`" \
+      --arg ip "\`$defanged_ip_address\`" \
       --arg log_level "Blocked" \
       --arg msg "IP Blocked for 24 hours" \
+      --arg reported "$reported_ip_status" \
       --arg timestamp "\`$extracted_timestamp\`" \
       '{
         embeds: [
@@ -43,6 +50,7 @@ tail -f "$LOG_FILE" | while IFS= read -r line; do
               { name: "Extracted Timestamp", value: $timestamp, inline: true },
               { name: "Report Level", value: $log_level, inline: false },
               { name: "Details", value: $msg, inline: false },
+              { name: "AbuseIPDB Report Status:", value: $reported, inline: false},
               { name: "Report Category", value: "Brute Force, SSH", inline: false }
             ],
           }
