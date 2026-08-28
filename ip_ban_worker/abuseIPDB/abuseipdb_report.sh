@@ -29,8 +29,15 @@ curl_status_code=$(curl https://api.abuseipdb.com/api/v2/report -o /dev/null -s 
   -H "Key: $ABUSE_IPDB_API_KEY" \
   -H "Accept: application/json")
 
+# Handle different response status codes
 if [ "$curl_status_code" -eq 200 ]; then
   echo "IP has been reported to AbuseIPDB."
 elif [ "$curl_status_code" -eq 429 ]; then
   echo "You can only report the same IP address once in 15 minutes."
+elif [ "$curl_status_code" -ge 400 ] && [ "$curl_status_code" -le 499 ]; then
+  echo "There is an unknown error at the client side."
+elif [ "$curl_status_code" -ge 500 ] && [ "$curl_status_code" -le 599 ]; then
+  echo "There is an unknown error at the server side."
+else
+  echo "Unknown status code received."
 fi
