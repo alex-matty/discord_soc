@@ -30,35 +30,38 @@ tail -f "$LOG_FILE" | while IFS= read -r line; do
     extracted_timestamp=$(echo $line | awk '{print $1, $2}')
 
     # Send the IP address to the abuseipdb_report.sh script for reporting
-    reported_ip_status=$("$dir_name/abuseIPDB/abuseipdb_report.sh" $ip_address)
+    reported_ip_status=$("$dir_name/abuseIPDB/abuseipdb_report.sh" $ip_address 2>> ip_ban.log )
+    exit_status=$?
 
-    json_payload=$(jq -n -c \
-      --arg title "Fail2Ban IP Block Notification" \
-      --arg color "$EMBED_COLOR" \
-      --arg ip "\`$defanged_ip_address\`" \
-      --arg log_level "Blocked" \
-      --arg msg "IP Blocked for 24 hours" \
-      --arg reported "$reported_ip_status" \
-      --arg timestamp "\`$extracted_timestamp\`" \
-      '{
-        embeds: [
-          {
-            title: $title,
-            color: ($color | tonumber),
-            fields: [
-              { name: "Banned IP Address", value: $ip, inline: true },
-              { name: "Extracted Timestamp", value: $timestamp, inline: true },
-              { name: "Report Level", value: $log_level, inline: false },
-              { name: "Details", value: $msg, inline: false },
-              { name: "AbuseIPDB Report Status:", value: $reported, inline: false},
-              { name: "Report Category", value: "Brute Force, SSH", inline: false }
-            ],
-          }
-        ]
-      }')
+    if [ "$exit_status" -eq 0 ]; then
+      json_payload=$(jq -n -c \
+        --arg title "Fail2Ban IP Block Notification" \
+        --arg color "$EMBED_COLOR" \
+        --arg ip "\`$defanged_ip_address\`" \
+        --arg log_level "Blocked" \
+        --arg msg "IP Blocked for 24 hours" \
+        --arg reported "$reported_ip_status" \
+        --arg timestamp "\`$extracted_timestamp\`" \
+        '{
+          embeds: [
+            {
+              title: $title,
+              color: ($color | tonumber),
+              fields: [
+                { name: "Banned IP Address", value: $ip, inline: true },
+                { name: "Extracted Timestamp", value: $timestamp, inline: true },
+                { name: "Report Level", value: $log_level, inline: false },
+                { name: "Details", value: $msg, inline: false },
+                { name: "AbuseIPDB Report Status:", value: $reported, inline: false},
+                { name: "Report Category", value: "Brute Force, SSH", inline: false }
+              ],
+            }
+          ]
+        }')
 
-    # Send Payload to discord webhook
-    curl -H "Content-Type: application/json" -X POST -d "$json_payload" "$WEBHOOK"
+      # Send Payload to discord webhook
+      curl -H "Content-Type: application/json" -X POST -d "$json_payload" "$WEBHOOK"
+    fi
 
   fi
 
