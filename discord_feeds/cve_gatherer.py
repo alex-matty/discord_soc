@@ -14,11 +14,16 @@ import os
 def load_env(file_path=None):
   if file_path is None:
     file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.env")
-    with open(file_path) as f:
-      for line in f:
-        if line.strip() and not line.startswith("#"):
-          key, value = line.strip().split("=", 1)
-          os.environ[key] = value
+
+    try:
+      with open(file_path) as f:
+        for line in f:
+          if line.strip() and not line.startswith("#"):
+            key, value = line.strip().split("=", 1)
+            os.environ[key.strip()] = value.strip('"').strip("'")
+
+    except FileNotFoundError:
+      print(f".env file not found at {file_path}")
 
 load_env()
 
